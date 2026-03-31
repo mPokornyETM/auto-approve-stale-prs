@@ -1,24 +1,35 @@
 # Auto-approve Stale PRs
 
-A GitHub Action that auto-approves PRs from repository owners/members after a configurable number of days without review. Eliminates wasted time waiting for reviews that never come.
+A GitHub Action that auto-approves PRs after a configurable countdown. Uses an **opt-in model** where the PR author must manually start the countdown by adding a label.
 
 ## Features
 
+- 🔐 **Opt-in model** — Author must manually add label to start countdown
 - 🕐 **Configurable countdown** — Set any number of days (default: 3)
+- 🚦 **Respects CI status** — Countdown pauses when checks are failing
 - 🏷️ **Visual countdown labels** — Clear visibility into merge timeline
-- 💬 **PR comments** — Notifies when countdown starts and at each stage
-- 🔒 **Safety guards** — Only processes OWNER/MEMBER PRs, skips already-approved PRs
+- 💬 **PR comments** — Notifies at each countdown stage
 - 📝 **Dry-run mode** — Test without making changes
-- ⚙️ **Flexible merge methods** — Supports squash, merge, or rebase
 
 ## How It Works
 
+1. **Opt-in**: PR author adds `merge-in-3-days-without-review` label
+2. **Daily run**: Workflow advances countdown (if CI is green)
+3. **Auto-approve**: After countdown reaches 0, PR is approved and auto-merged
+
 | Day | Label | Comment |
 |-----|-------|---------|
-| 0 | `merge-in-3-days-without-review` | 📋 Auto-merge countdown started... |
+| 0 (manual) | `merge-in-3-days-without-review` | Author adds label to opt-in |
 | 1 | `merge-in-2-days-without-review` | ⏳ Auto-merge countdown: 2 days... |
 | 2 | `merge-in-1-day-without-review` | ⚠️ Auto-merge countdown: 1 day... |
 | 3 | `merged-without-review` | ✅ Auto-approved: Merging now. |
+
+### CI Check
+
+If CI checks are failing, the countdown **pauses**:
+- No label change
+- No comment posted
+- Countdown resumes when CI turns green
 
 ## Usage
 
@@ -64,6 +75,7 @@ jobs:
 | `author-associations` | Comma-separated list: OWNER, MEMBER, COLLABORATOR | `OWNER,MEMBER` |
 | `merge-method` | Merge method: squash, merge, rebase | `squash` |
 | `skip-drafts` | Skip draft PRs | `true` |
+| `require-green-ci` | Pause countdown when CI checks are failing | `true` |
 | `dry-run` | Log actions without making changes | `false` |
 | `token` | GitHub token (needs PR write access) | `github.token` |
 
@@ -87,11 +99,11 @@ The action automatically creates these labels (idempotent):
 
 ## Safety
 
-- ✅ Only PRs from OWNER/MEMBER are processed
-- ✅ External contributor PRs are **never** touched
+- ✅ **Opt-in only** — PRs must have countdown label to be processed
+- ✅ **CI must be green** — Countdown pauses when checks fail
 - ✅ PRs with existing approvals are skipped
 - ✅ Draft PRs are skipped by default
-- ✅ CI must still pass (auto-merge respects branch protection)
+- ✅ Auto-merge respects branch protection rules
 
 ## License
 

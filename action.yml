@@ -27,6 +27,10 @@ inputs:
     description: 'If true, skip draft PRs (default: true)'
     required: false
     default: 'true'
+  require-green-ci:
+    description: 'If true, pause countdown when CI checks are failing (default: true)'
+    required: false
+    default: 'true'
   token:
     description: 'GitHub token with pull-requests write permission'
     required: false
@@ -53,4 +57,5 @@ runs:
         MERGE_METHOD: ${{ inputs.merge-method }}
         DRY_RUN: ${{ inputs.dry-run }}
         SKIP_DRAFTS: ${{ inputs.skip-drafts }}
+        REQUIRE_GREEN_CI: ${{ inputs.require-green-ci }}
       run: ${{ github.action_path }}/scripts/countdown.sh
