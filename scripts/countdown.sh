@@ -60,9 +60,31 @@ add_label() {
   fi
 }
 
+# Check if a comment containing a marker already exists (for deduplication)
+comment_exists() {
+  local pr=$1
+  local marker=$2
+  local existing
+  existing=$(gh pr view "$pr" --repo "$REPO" --json comments --jq ".comments[].body" 2>/dev/null || echo "")
+  if echo "$existing" | grep -qF "$marker"; then
+    return 0  # Comment exists
+  fi
+  return 1  # Comment does not exist
+}
+
 add_comment() {
   local pr=$1
   local body=$2
+  local dedup_marker=${3:-""}  # Optional marker for deduplication
+  
+  # If dedup marker provided, check if similar comment already exists
+  if [ -n "$dedup_marker" ]; then
+    if comment_exists "$pr" "$dedup_marker"; then
+      echo "    Comment already exists (dedup: $dedup_marker) — skipping"
+      return 0
+    fi
+  fi
+  
   if [ "$DRY_RUN" == "true" ]; then
     echo "    [DRY-RUN] Would add comment: $body"
   else
@@ -203,7 +225,7 @@ echo "$prs" | jq -c '.[]' | while IFS= read -r pr; do
   echo "  Checking CI status..."
   if ! check_ci_status "$PR_NUMBER"; then
     echo "  Status: CI not green — PAUSED (countdown frozen)"
-    add_comment "$PR_NUMBER" "⏸️ **Auto-merge countdown PAUSED**: CI checks are not passing. The countdown will resume when all checks are green."
+    add_comment "$PR_NUMBER" "⏸️ **Auto-merge countdown PAUSED**: CI checks are not passing. The countdown will resume when all checks are green." "Auto-merge countdown PAUSED"
     continue
   fi
   echo "  CI: ✓ Green"
