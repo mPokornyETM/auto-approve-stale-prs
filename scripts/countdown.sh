@@ -203,6 +203,7 @@ echo "$prs" | jq -c '.[]' | while IFS= read -r pr; do
   echo "  Checking CI status..."
   if ! check_ci_status "$PR_NUMBER"; then
     echo "  Status: CI not green — PAUSED (countdown frozen)"
+    add_comment "$PR_NUMBER" "⏸️ **Auto-merge countdown PAUSED**: CI checks are not passing. The countdown will resume when all checks are green."
     continue
   fi
   echo "  CI: ✓ Green"
