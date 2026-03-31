@@ -147,7 +147,7 @@ prs=$(gh pr list --repo "$REPO" --state open --label "$START_LABEL" --json numbe
 
 # Also fetch PRs with other countdown labels
 for ((i=DAYS-1; i>=1; i--)); do
-  local check_label
+  check_label=""
   if [ "$i" -eq 1 ]; then
     check_label="merge-in-1-day-without-review"
   else
