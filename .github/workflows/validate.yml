@@ -1,0 +1,71 @@
+name: Validate Action
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'action.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'action.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate action.yml syntax
+        run: |
+          echo "Validating action.yml..."
+          
+          if [ ! -f action.yml ]; then
+            echo "❌ action.yml not found"
+            exit 1
+          fi
+          
+          python3 -c "import yaml; yaml.safe_load(open('action.yml'))" || {
+            echo "❌ Invalid YAML syntax"
+            exit 1
+          }
+          
+          python3 << 'EOF'
+          import yaml
+          import sys
+          
+          with open('action.yml') as f:
+              action = yaml.safe_load(f)
+          
+          errors = []
+          
+          if not action.get('name'):
+              errors.append("Missing 'name' field")
+          if not action.get('description'):
+              errors.append("Missing 'description' field")
+          if not action.get('author'):
+              errors.append("Missing 'author' field")
+          
+          branding = action.get('branding', {})
+          if not branding.get('icon'):
+              errors.append("Missing 'branding.icon' field")
+          if not branding.get('color'):
+              errors.append("Missing 'branding.color' field")
+          
+          valid_colors = ['white', 'yellow', 'blue', 'green', 'orange', 'red', 'purple', 'gray-dark']
+          if branding.get('color') and branding['color'] not in valid_colors:
+              errors.append(f"Invalid branding color: {branding['color']}")
+          
+          if errors:
+              print("❌ Validation failed:")
+              for e in errors:
+                  print(f"  - {e}")
+              sys.exit(1)
+          
+          print("✅ action.yml is valid for GitHub Marketplace")
+          print(f"  Name: {action['name']}")
+          print(f"  Author: {action['author']}")
+          print(f"  Icon: {branding.get('icon')}")
+          print(f"  Color: {branding.get('color')}")
+          EOF

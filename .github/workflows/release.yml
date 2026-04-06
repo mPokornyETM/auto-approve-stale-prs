@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag info
+        id: tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          MAJOR=$(echo $TAG | cut -d. -f1)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
+        run: |
+          TAG=${{ steps.tag.outputs.tag }}
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            cat > release_notes.md << 'NOTES'
+          ## Initial Release
+          
+          First release of the Auto-approve Stale PRs Action.
+          
+          ### Features
+          - Auto-approves owner/member PRs after configurable days
+          - Countdown labels and comments
+          - Configurable merge method
+          - CI status awareness
+          NOTES
+          else
+            echo "## What's Changed" > release_notes.md
+            echo "" >> release_notes.md
+            git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD >> release_notes.md
+            echo "" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG}" >> release_notes.md
+          fi
+          
+          echo "Generated release notes:"
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sleep 5
+          gh release create ${{ steps.tag.outputs.tag }} \
+            --title "${{ steps.tag.outputs.tag }}" \
+            --notes-file release_notes.md
+
+      - name: Update major version tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MAJOR=${{ steps.tag.outputs.major }}
+          echo "Updating $MAJOR to point to ${{ steps.tag.outputs.tag }}"
+          
+          git tag -d $MAJOR 2>/dev/null || true
+          git push origin :refs/tags/$MAJOR 2>/dev/null || true
+          
+          git tag $MAJOR
+          git push origin $MAJOR
+          
+          echo "Updated $MAJOR tag"
