@@ -81,7 +81,7 @@ jobs:
 | `dry-run` | Log actions without making changes | `false` |
 | `token` | GitHub token (needs PR write access) | `github.token` |
 
-PRs whose base branch is listed in `release-branches` (release and hotfix PRs in GitFlow) are merged with `release-merge-method`, so a ruleset that allows only merge commits on `main` keeps working. All other PRs use `merge-method`. If auto-merge cannot be enabled, the action now logs a warning instead of failing silently.
+PRs whose base branch is listed in `release-branches` (release and hotfix PRs in GitFlow) are merged with `release-merge-method`, so a ruleset that allows only merge commits on `main` keeps working. All other PRs use `merge-method`. If auto-merge cannot be enabled, the action now logs a warning instead of failing silently. If a PR already has auto-merge enabled (for example a merge commit chosen by a workflow that created the PR), the action only approves it and keeps that method.
 
 ## Prerequisites
 

@@ -186,7 +186,7 @@ echo "Fetching open PRs with countdown labels..."
 echo "  Label filter: $LABEL_FILTER"
 
 # Fetch PRs with countdown labels
-prs=$(gh pr list --repo "$REPO" --state open --label "$START_LABEL" --json number,title,author,labels,isDraft,baseRefName 2>/dev/null || echo "[]")
+prs=$(gh pr list --repo "$REPO" --state open --label "$START_LABEL" --json number,title,author,labels,isDraft,baseRefName,autoMergeRequest 2>/dev/null || echo "[]")
 
 # Also fetch PRs with other countdown labels
 for ((i=DAYS-1; i>=1; i--)); do
@@ -196,7 +196,7 @@ for ((i=DAYS-1; i>=1; i--)); do
   else
     check_label="merge-in-${i}-days-without-review"
   fi
-  more_prs=$(gh pr list --repo "$REPO" --state open --label "$check_label" --json number,title,author,labels,isDraft,baseRefName 2>/dev/null || echo "[]")
+  more_prs=$(gh pr list --repo "$REPO" --state open --label "$check_label" --json number,title,author,labels,isDraft,baseRefName,autoMergeRequest 2>/dev/null || echo "[]")
   # Merge arrays (dedup by number)
   prs=$(echo "$prs $more_prs" | jq -s 'add | unique_by(.number)')
 done
@@ -219,6 +219,7 @@ echo "$prs" | jq -c '.[]' | while IFS= read -r pr; do
   AUTHOR=$(echo "$pr" | jq -r '.author.login')
   IS_DRAFT=$(echo "$pr" | jq -r '.isDraft')
   BASE_REF=$(echo "$pr" | jq -r '.baseRefName')
+  AUTO_MERGE_ENABLED=$(echo "$pr" | jq -r '.autoMergeRequest.mergeMethod // empty')
   PR_LABELS=$(echo "$pr" | jq -r '[.labels[].name] | join(",")')
 
   echo "────────────────────────────────────────"
@@ -267,7 +268,12 @@ echo "$prs" | jq -c '.[]' | while IFS= read -r pr; do
     add_comment "$PR_NUMBER" "✅ **Auto-approved**: No review received within ${DAYS} days. Merging now."
     add_label "$PR_NUMBER" "$FINAL_LABEL"
     approve_pr "$PR_NUMBER" "Auto-approved: no review received within ${DAYS} days of opening."
-    merge_pr "$PR_NUMBER" "$(merge_method_for_base "$BASE_REF")"
+    if [ -n "$AUTO_MERGE_ENABLED" ]; then
+      # The PR owner already chose a method (e.g. merge commit for upmerge PRs): do not override it.
+      echo "  Auto-merge already enabled (${AUTO_MERGE_ENABLED}) — keeping it"
+    else
+      merge_pr "$PR_NUMBER" "$(merge_method_for_base "$BASE_REF")"
+    fi
   else
     # Advance to next day
     NEXT_POS=$((CURRENT_POS - 1))
