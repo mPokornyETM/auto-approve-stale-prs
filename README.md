@@ -74,10 +74,14 @@ jobs:
 | `days-until-approve` | Days to wait before auto-approving | `3` |
 | `author-associations` | Comma-separated list: OWNER, MEMBER, COLLABORATOR | `OWNER,MEMBER` |
 | `merge-method` | Merge method: squash, merge, rebase | `squash` |
+| `release-branches` | Comma-separated base branches that receive release/hotfix PRs | `main,master` |
+| `release-merge-method` | Merge method for PRs into `release-branches` (keeps release history); empty = use `merge-method` | `merge` |
 | `skip-drafts` | Skip draft PRs | `true` |
 | `require-green-ci` | Pause countdown when CI checks are failing | `true` |
 | `dry-run` | Log actions without making changes | `false` |
 | `token` | GitHub token (needs PR write access) | `github.token` |
+
+PRs whose base branch is listed in `release-branches` (release and hotfix PRs in GitFlow) are merged with `release-merge-method`, so a ruleset that allows only merge commits on `main` keeps working. All other PRs use `merge-method`. If auto-merge cannot be enabled, the action now logs a warning instead of failing silently. If a PR already has auto-merge enabled (for example a merge commit chosen by a workflow that created the PR), the action only approves it and keeps that method.
 
 ## Prerequisites
 
