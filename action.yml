@@ -19,6 +19,14 @@ inputs:
     description: 'Merge method: squash, merge, or rebase'
     required: false
     default: 'squash'
+  release-branches:
+    description: 'Comma-separated base branches that receive release/hotfix PRs (e.g. main)'
+    required: false
+    default: 'main,master'
+  release-merge-method:
+    description: 'Merge method for PRs into release-branches (keeps the release history). Empty = use merge-method'
+    required: false
+    default: 'merge'
   dry-run:
     description: 'If true, only log actions without making changes'
     required: false
@@ -55,6 +63,8 @@ runs:
         DAYS: ${{ inputs.days-until-approve }}
         ASSOCIATIONS: ${{ inputs.author-associations }}
         MERGE_METHOD: ${{ inputs.merge-method }}
+        RELEASE_BRANCHES: ${{ inputs.release-branches }}
+        RELEASE_MERGE_METHOD: ${{ inputs.release-merge-method }}
         DRY_RUN: ${{ inputs.dry-run }}
         SKIP_DRAFTS: ${{ inputs.skip-drafts }}
         REQUIRE_GREEN_CI: ${{ inputs.require-green-ci }}

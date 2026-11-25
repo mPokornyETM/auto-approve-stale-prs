@@ -7,6 +7,8 @@ set -euo pipefail
 DAYS=${DAYS:-3}
 ASSOCIATIONS=${ASSOCIATIONS:-"OWNER,MEMBER"}
 MERGE_METHOD=${MERGE_METHOD:-"squash"}
+RELEASE_BRANCHES=${RELEASE_BRANCHES:-"main,master"}
+RELEASE_MERGE_METHOD=${RELEASE_MERGE_METHOD-"merge"}
 DRY_RUN=${DRY_RUN:-"false"}
 SKIP_DRAFTS=${SKIP_DRAFTS:-"true"}
 REQUIRE_GREEN_CI=${REQUIRE_GREEN_CI:-"true"}
@@ -18,6 +20,7 @@ echo "Configuration:"
 echo "  Days until approve: $DAYS"
 echo "  Author associations: $ASSOCIATIONS"
 echo "  Merge method: $MERGE_METHOD"
+echo "  Release branches: $RELEASE_BRANCHES (merge method: ${RELEASE_MERGE_METHOD:-$MERGE_METHOD})"
 echo "  Dry run: $DRY_RUN"
 echo "  Skip drafts: $SKIP_DRAFTS"
 echo "  Require green CI: $REQUIRE_GREEN_CI"
@@ -102,12 +105,30 @@ approve_pr() {
   fi
 }
 
+# Release/hotfix PRs into a release branch keep their history (merge commit),
+# everything else uses MERGE_METHOD.
+merge_method_for_base() {
+  local base=$1
+  local b
+  IFS=',' read -ra RELEASE_ARRAY <<< "$RELEASE_BRANCHES"
+  for b in "${RELEASE_ARRAY[@]}"; do
+    b=$(echo "$b" | xargs)
+    if [ -n "$RELEASE_MERGE_METHOD" ] && [ "$b" == "$base" ]; then
+      echo "$RELEASE_MERGE_METHOD"
+      return
+    fi
+  done
+  echo "$MERGE_METHOD"
+}
+
 merge_pr() {
   local pr=$1
+  local method=$2
   if [ "$DRY_RUN" == "true" ]; then
-    echo "    [DRY-RUN] Would enable auto-merge (${MERGE_METHOD})"
+    echo "    [DRY-RUN] Would enable auto-merge (${method})"
   else
-    gh pr merge "$pr" --repo "$REPO" --auto --"$MERGE_METHOD" || true
+    gh pr merge "$pr" --repo "$REPO" --auto --"$method" \
+      || echo "::warning::Could not enable auto-merge (${method}) on PR #${pr}. Check that the method is allowed for the base branch and that auto-merge is enabled in the repository."
   fi
 }
 
@@ -165,7 +186,7 @@ echo "Fetching open PRs with countdown labels..."
 echo "  Label filter: $LABEL_FILTER"
 
 # Fetch PRs with countdown labels
-prs=$(gh pr list --repo "$REPO" --state open --label "$START_LABEL" --json number,title,author,labels,isDraft 2>/dev/null || echo "[]")
+prs=$(gh pr list --repo "$REPO" --state open --label "$START_LABEL" --json number,title,author,labels,isDraft,baseRefName 2>/dev/null || echo "[]")
 
 # Also fetch PRs with other countdown labels
 for ((i=DAYS-1; i>=1; i--)); do
@@ -175,7 +196,7 @@ for ((i=DAYS-1; i>=1; i--)); do
   else
     check_label="merge-in-${i}-days-without-review"
   fi
-  more_prs=$(gh pr list --repo "$REPO" --state open --label "$check_label" --json number,title,author,labels,isDraft 2>/dev/null || echo "[]")
+  more_prs=$(gh pr list --repo "$REPO" --state open --label "$check_label" --json number,title,author,labels,isDraft,baseRefName 2>/dev/null || echo "[]")
   # Merge arrays (dedup by number)
   prs=$(echo "$prs $more_prs" | jq -s 'add | unique_by(.number)')
 done
@@ -197,12 +218,14 @@ echo "$prs" | jq -c '.[]' | while IFS= read -r pr; do
   TITLE=$(echo "$pr" | jq -r '.title')
   AUTHOR=$(echo "$pr" | jq -r '.author.login')
   IS_DRAFT=$(echo "$pr" | jq -r '.isDraft')
+  BASE_REF=$(echo "$pr" | jq -r '.baseRefName')
   PR_LABELS=$(echo "$pr" | jq -r '[.labels[].name] | join(",")')
 
   echo "────────────────────────────────────────"
   echo "PR #${PR_NUMBER}: ${TITLE}"
   echo "  Author: ${AUTHOR}"
   echo "  Draft: ${IS_DRAFT}"
+  echo "  Base: ${BASE_REF}"
   echo "  Labels: ${PR_LABELS}"
 
   # Skip drafts if configured
@@ -244,7 +267,7 @@ echo "$prs" | jq -c '.[]' | while IFS= read -r pr; do
     add_comment "$PR_NUMBER" "✅ **Auto-approved**: No review received within ${DAYS} days. Merging now."
     add_label "$PR_NUMBER" "$FINAL_LABEL"
     approve_pr "$PR_NUMBER" "Auto-approved: no review received within ${DAYS} days of opening."
-    merge_pr "$PR_NUMBER"
+    merge_pr "$PR_NUMBER" "$(merge_method_for_base "$BASE_REF")"
   else
     # Advance to next day
     NEXT_POS=$((CURRENT_POS - 1))
